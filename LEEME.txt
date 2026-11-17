@@ -1,0 +1,5 @@
+LABORATORIO HECHO B - LOGISTICA GLOBAL S.A.
+Subir inventario.sh, escaneo.sh, migracion.sh, actualizacion.yml y comparacion.py a la raiz del repositorio. Crear .github/workflows/auditoria-parches.yml con el contenido del archivo auditoria-parches.yml (no subir este ultimo a la raiz si ya se creo en workflows).
+Ejecutar Actions > Migracion y Parches - Hecho B > Run workflow.
+Los contenedores son ficticios, no son maquinas virtuales independientes. No se exponen puertos; Debian EOL usa red none. Se reemplazan contenedores sin datos productivos. En una empresa real se requieren respaldos, pruebas y migracion de servicios y datos.
+Requisitos para ejecucion local opcional: Linux con Bash, Docker, Trivy, Python 3 y ansible-core; usar exclusivamente una maquina de laboratorio. Ejecutar los scripts en el mismo orden indicado en el workflow. Los archivos de evidencia se generan durante la ejecucion, no se incluyen resultados ficticios.

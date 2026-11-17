@@ -1,0 +1,49 @@
+---
+- name: Gestion de parches en contenedores del laboratorio
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    servidores: ["01", "02", "03", "04", "05"]
+  tasks:
+    - name: Verificar etiqueta y sistema antes de actualizar
+      ansible.builtin.command:
+        argv: [docker, exec, "logistica-b-srv-{{ item }}", sh, -c, '. /etc/os-release; echo "$ID:$VERSION_ID"']
+      loop: "{{ servidores }}"
+      register: versiones
+      changed_when: false
+      failed_when: versiones.rc != 0 or versiones.stdout != 'ubuntu:24.04'
+    - name: Validar que son contenedores del laboratorio
+      ansible.builtin.command:
+        argv: [docker, inspect, "logistica-b-srv-{{ item }}"]
+      loop: "{{ servidores }}"
+      register: etiqueta
+      changed_when: false
+      failed_when: etiqueta.rc != 0 or (etiqueta.stdout | from_json)[0].Config.Labels['logistica.hecho-b'] != 'lab'
+    - name: Actualizar indices APT
+      ansible.builtin.command:
+        argv: [docker, exec, "logistica-b-srv-{{ item }}", apt-get, update]
+      loop: "{{ servidores }}"
+    - name: Aplicar actualizaciones disponibles
+      ansible.builtin.command:
+        argv: [docker, exec, -e, DEBIAN_FRONTEND=noninteractive, "logistica-b-srv-{{ item }}", apt-get, -y, upgrade]
+      loop: "{{ servidores }}"
+      register: parches
+    - name: Mostrar resultados de APT por servidor
+      ansible.builtin.debug:
+        msg: "SRV-{{ item.item }}: {{ item.stdout_lines }}"
+      loop: "{{ parches.results }}"
+      loop_control:
+        label: "SRV-{{ item.item }}"
+    - name: Consultar actualizaciones pendientes
+      ansible.builtin.command:
+        argv: [docker, exec, "logistica-b-srv-{{ item }}", apt, list, --upgradable]
+      loop: "{{ servidores }}"
+      register: pendientes
+      changed_when: false
+    - name: Mostrar paquetes pendientes
+      ansible.builtin.debug:
+        msg: "SRV-{{ item.item }}: {{ item.stdout_lines }}"
+      loop: "{{ pendientes.results }}"
+      loop_control:
+        label: "SRV-{{ item.item }}"
