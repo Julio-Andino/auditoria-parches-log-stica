@@ -1,0 +1,134 @@
+name: Auditoria de Vulnerabilidades - Hecho B
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  escaneo-inicial:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Instalar Trivy
+        uses: aquasecurity/setup-trivy@e07451d2e059ed86c2870430ea286b3a9e0bf241
+        with:
+          version: v0.76.2
+
+      - name: Crear inventario de servidores
+        run: |
+          mkdir -p evidencias
+
+          cat > evidencias/inventario.csv <<'EOF'
+          Servidor,Sistema,Estado
+          SRV-01,Debian 10,EOL
+          SRV-02,Debian 10,EOL
+          SRV-03,Ubuntu 24.04,Vigente
+          SRV-04,Ubuntu 24.04,Vigente
+          SRV-05,Ubuntu 24.04,Vigente
+          EOF
+
+          cat evidencias/inventario.csv
+
+          echo "Total servidores simulados: 5"
+          echo "Servidores EOL: 2"
+          echo "Porcentaje EOL: 40%"
+
+          trivy --version
+
+      - name: Descargar imagenes Linux
+        run: |
+          docker pull debian/eol:buster
+          docker pull ubuntu:24.04
+
+          docker images
+
+          docker image inspect debian/eol:buster \
+            --format '{{json .RepoDigests}}' \
+            > evidencias/debian-digest.txt
+
+          docker image inspect ubuntu:24.04 \
+            --format '{{json .RepoDigests}}' \
+            > evidencias/ubuntu-digest.txt
+
+      - name: Escanear Debian 10 EOL
+        run: |
+          trivy image \
+            --scanners vuln \
+            --pkg-types os \
+            --exit-code 0 \
+            --format json \
+            --output evidencias/debian-eol.json \
+            debian/eol:buster
+
+          trivy convert --format table \
+            evidencias/debian-eol.json \
+            | tee evidencias/debian-eol.txt
+
+      - name: Escanear Ubuntu 24.04 LTS
+        run: |
+          trivy image \
+            --scanners vuln \
+            --pkg-types os \
+            --exit-code 0 \
+            --format json \
+            --output evidencias/ubuntu-lts.json \
+            ubuntu:24.04
+
+          trivy convert --format table \
+            evidencias/ubuntu-lts.json \
+            | tee evidencias/ubuntu-lts.txt
+
+      - name: Generar comparacion de vulnerabilidades
+        run: |
+          python3 - <<'PY' | tee evidencias/resumen.txt
+          import json
+          from collections import Counter
+
+          print("LOGISTICA GLOBAL S.A.")
+          print("AUDITORIA DE VULNERABILIDADES")
+          print("HECHO B - SISTEMAS OPERATIVOS")
+          print("Laboratorio con imagenes Docker")
+
+          for nombre, archivo in [
+              ("Debian 10 EOL", "debian-eol.json"),
+              ("Ubuntu 24.04 LTS", "ubuntu-lts.json")
+          ]:
+              with open("evidencias/" + archivo) as f:
+                  reporte = json.load(f)
+
+              vulnerabilidades = [
+                  v
+                  for resultado in reporte.get("Results", [])
+                  for v in (resultado.get("Vulnerabilities") or [])
+              ]
+
+              conteo = Counter(
+                  v.get("Severity", "UNKNOWN")
+                  for v in vulnerabilidades
+              )
+
+              print("\nSistema:", nombre)
+              print("Total:", len(vulnerabilidades))
+
+              for nivel in [
+                  "CRITICAL", "HIGH", "MEDIUM",
+                  "LOW", "UNKNOWN"
+              ]:
+                  print(nivel + ":", conteo[nivel])
+
+          print("\nServidores simulados: 5")
+          print("Servidores EOL: 2")
+          print("Porcentaje EOL: 40%")
+          print("FIN DEL ESCANEO INICIAL")
+          PY
+
+      - name: Guardar evidencias tecnicas
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: Evidencias-Hecho-B-Inicial
+          path: evidencias/
+          retention-days: 30
