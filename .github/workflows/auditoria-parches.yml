@@ -1,0 +1,61 @@
+name: Migracion y Parches - Hecho B
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  laboratorio:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+      - name: Instalar Trivy
+        uses: aquasecurity/setup-trivy@e07451d2e059ed86c2870430ea286b3a9e0bf241
+        with:
+          version: v0.76.2
+      - name: Instalar Ansible
+        run: |
+          python3 -m venv "$RUNNER_TEMP/ansible-env"
+          "$RUNNER_TEMP/ansible-env/bin/pip" install 'ansible-core>=2.18,<2.20'
+          echo "$RUNNER_TEMP/ansible-env/bin" >> "$GITHUB_PATH"
+      - name: Inventario inicial de cinco contenedores
+        run: bash inventario.sh inicial | tee evidencias-inicial.log
+      - name: Escaneo inicial con Trivy
+        run: |
+          bash escaneo.sh debian/eol:buster debian-inicial
+          bash escaneo.sh ubuntu:24.04 ubuntu-inicial
+      - name: Migrar servidores EOL
+        run: bash migracion.sh | tee evidencias/migracion.log
+      - name: Aplicar parches con Ansible
+        run: |
+          ansible-playbook -i localhost, actualizacion.yml | tee evidencias/parches-ansible.log
+      - name: Inventario final
+        run: bash inventario.sh final | tee evidencias/inventario-final.log
+      - name: Escanear los cinco sistemas actualizados
+        run: |
+          for n in 01 02 03 04 05; do
+            docker exec "logistica-b-srv-$n" dpkg-query -W > "evidencias/paquetes-srv-$n.txt"
+            docker commit "logistica-b-srv-$n" "logistica-b:srv-$n-final"
+            bash escaneo.sh "logistica-b:srv-$n-final" "srv-$n-final"
+          done
+      - name: Comparar resultados
+        run: python3 comparacion.py | tee evidencias/resumen-final.txt
+      - name: Guardar evidencias
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: Evidencias-Hecho-B-Parches
+          path: |
+            evidencias/
+            evidencias-inicial.log
+          retention-days: 30
+      - name: Limpiar contenedores del laboratorio
+        if: always()
+        run: |
+          docker ps -aq --filter label=logistica.hecho-b=lab | xargs -r docker rm -f
