@@ -1,0 +1,32 @@
+HECHO C - APOYO TECNICO DEL INTEGRANTE 5
+Logistica Global S.A. - Laboratorio de respaldo y restauracion PostgreSQL
+
+GITHUB
+1. En el repositorio del Hecho B, subir los seis archivos .sh y este LEEME.
+2. Crear .github/workflows/auditoria-respaldos.yml y copiar el contenido del YAML.
+3. Actions > Respaldo y Restauracion - Hecho C > Run workflow > main.
+4. Revisar los cuatro pasos de prueba; descargar el artifact de Summary.
+5. Guardar capturas de preparacion, respaldo, restauracion, validacion y resumen.
+
+LINUX LOCAL (solo laboratorio): requiere Docker activo, Bash, OpenSSL y GNU coreutils.
+Ejecutar desde la carpeta de los scripts, con acceso al daemon Docker:
+  bash hecho_c_preparar.sh
+  bash hecho_c_backup.sh
+  bash hecho_c_restaurar.sh
+  bash hecho_c_validar.sh
+  bash hecho_c_limpiar.sh
+No ejecutar sobre infraestructura productiva. El script de restauracion elimina exclusivamente
+el contenedor original etiquetado como laboratorio. No se publican puertos. Las contrasenas
+son aleatorias y temporales. El respaldo contiene exclusivamente datos ficticios.
+
+RESULTADO ESPERADO (no es evidencia de una ejecucion):
+5 registros, 610 unidades, hash identico de los CSV, respaldo SHA-256 validado,
+3 restricciones verificadas (1 clave primaria y 2 CHECK).
+
+LIMITACIONES
+La copia se guarda fuera del contenedor pero en la misma maquina virtual durante el ejercicio.
+El artifact de GitHub es temporal (30 dias), no un sistema de respaldo empresarial ni prueba
+de separacion geografica. No se miden el RPO/RTO de la empresa. El ejercicio prueba un respaldo
+logico de una base; no incluye roles globales ni recuperacion a un punto en el tiempo.
+Para produccion, disenar una estrategia 3-2-1, copias externas cifradas, control de acceso,
+retencion, monitoreo, pruebas periodicas y recuperacion de WAL/PITR segun RPO/RTO.
