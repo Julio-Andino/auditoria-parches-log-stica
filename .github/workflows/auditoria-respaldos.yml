@@ -1,0 +1,34 @@
+name: Respaldo y Restauracion - Hecho C
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  laboratorio-postgresql:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+      - name: Preparar base de datos original
+        run: |
+          mkdir -p evidencias-hecho-c
+          bash hecho_c_preparar.sh | tee evidencias-hecho-c/01-preparacion.log
+      - name: Generar respaldo y copia externa
+        run: bash hecho_c_backup.sh | tee evidencias-hecho-c/02-respaldo.log
+      - name: Simular perdida y restaurar PostgreSQL
+        run: bash hecho_c_restaurar.sh | tee evidencias-hecho-c/03-restauracion.log
+      - name: Validar integridad de los datos recuperados
+        run: bash hecho_c_validar.sh | tee evidencias-hecho-c/04-validacion.log
+      - name: Guardar evidencias y respaldo ficticio
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: Evidencias-Hecho-C-PostgreSQL
+          path: evidencias-hecho-c/
+          retention-days: 30
+      - name: Limpiar contenedores de laboratorio
+        if: always()
+        run: bash hecho_c_limpiar.sh
